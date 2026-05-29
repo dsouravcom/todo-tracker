@@ -78,7 +78,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     if (action === "View README") {
       vscode.env.openExternal(
-        vscode.Uri.parse("https://github.com/sourav/todo-tracker#readme")
+        vscode.Uri.parse("https://github.com/dsouravcom/todo-tracker#readme")
       );
     }
   }

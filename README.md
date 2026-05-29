@@ -2,7 +2,7 @@
 
 [![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/sourav.todo-tracker.svg?style=flat-squared&color=blue)](https://marketplace.visualstudio.com/items?itemName=sourav.todo-tracker)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/sourav.todo-tracker.svg?style=flat-squared)](https://marketplace.visualstudio.com/items?itemName=sourav.todo-tracker)
-[![License](https://img.shields.io/github/license/sourav/todo-tracker.svg?style=flat-squared&color=green)](https://github.com/sourav/todo-tracker/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/sourav/todo-tracker.svg?style=flat-squared&color=green)](https://github.com/dsouravcom/todo-tracker/blob/master/LICENSE)
 
 ## 🎥 How It Works
 
