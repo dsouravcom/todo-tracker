@@ -1,0 +1,72 @@
+{
+  "name": "todo-tracker",
+  "displayName": "TODO Tracker",
+  "description": "Track regular TODOs and priority @TODOs across your workspace with a smart sidebar view.",
+  "version": "1.0.0",
+  "publisher": "sourav",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sourav/todo-tracker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sourav/todo-tracker/issues"
+  },
+  "homepage": "https://github.com/sourav/todo-tracker#readme",
+  "categories": ["Other"],
+  "icon": "images/icon.png",
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "todoTracker",
+          "title": "TODO Tracker",
+          "icon": "images/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "todoTracker": [
+        {
+          "id": "todoTrackerView",
+          "name": "TODOs",
+          "icon": "images/sidebar-icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "todoTracker.refresh",
+        "title": "Refresh TODOs",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "todoTracker.openFile",
+        "title": "Open File"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "todoTracker.refresh",
+          "when": "view == todoTrackerView",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}
