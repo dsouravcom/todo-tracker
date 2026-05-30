@@ -128,7 +128,7 @@ async function runScan(
   const rootPath = workspaceFolders[0].uri.fsPath;
 
   try {
-    const allTodos = await scanWorkspace(rootPath);
+    const allTodos = await scanWorkspace(rootPath, vscode.env.appRoot);
     treeProvider.update(allTodos);
 
     const total = treeProvider.totalCount;
