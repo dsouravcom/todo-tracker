@@ -2,7 +2,7 @@
   "name": "todolens",
   "displayName": "TodoLens - TODO Tracker",
   "description": "Track regular TODOs and priority @TODOs across your workspace with a smart sidebar view.",
-  "version": "1.0.0",
+  "version": "1.5.2",
   "publisher": "sourav-dutta",
   "engines": {
     "vscode": "^1.85.0"

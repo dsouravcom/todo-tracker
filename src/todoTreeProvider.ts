@@ -11,7 +11,7 @@
  *   📋 Normal TODOs    (//TODO)    — default
  *
  * Priority sections appear first (P1 at top), normal TODOs at the bottom.
- * Each section is auto-expanded when it has items, collapsed when empty.
+ * Items inside each section are grouped by folder and file in a collapsible hierarchy.
  */
 
 import * as vscode from "vscode";
@@ -19,11 +19,6 @@ import { TodoItem, TodoKind } from "./todoScanner";
 
 // ─── Section definitions ──────────────────────────────────────────────────────
 
-/**
- * Static metadata for each section.
- * Drives both the section headers and the individual item icons/tooltips.
- * Add or reorder entries here to change the sidebar layout.
- */
 const SECTIONS: Array<{
   kind: TodoKind;
   label: string;          // Section header label (emoji + name)
@@ -35,57 +30,54 @@ const SECTIONS: Array<{
     kind: "p1",
     label: "🔥 P1 — Critical",
     itemEmoji: "🔥",
-    themeColor: "errorForeground",                  // Red — critical/error
+    themeColor: "errorForeground",
     tooltipPrefix: "🔥 CRITICAL (//!todo)",
   },
   {
     kind: "p2",
     label: "🔴 P2 — High",
     itemEmoji: "🔴",
-    themeColor: "list.warningForeground",           // Orange-red — warning
+    themeColor: "list.warningForeground",
     tooltipPrefix: "🔴 HIGH (//@todo)",
   },
   {
     kind: "p3",
     label: "🟠 P3 — Medium",
     itemEmoji: "🟠",
-    themeColor: "charts.orange",                    // Orange — medium
+    themeColor: "charts.orange",
     tooltipPrefix: "🟠 MEDIUM (//#todo)",
   },
   {
     kind: "p4",
     label: "🟡 P4 — Low",
     itemEmoji: "🟡",
-    themeColor: "charts.yellow",                    // Yellow — low
+    themeColor: "charts.yellow",
     tooltipPrefix: "🟡 LOW (//$todo)",
   },
   {
     kind: "p5",
     label: "🔵 P5 — Idea",
     itemEmoji: "🔵",
-    themeColor: "charts.blue",                      // Blue — idea/optional
+    themeColor: "charts.blue",
     tooltipPrefix: "🔵 IDEA (//?todo)",
   },
   {
     kind: "normal",
     label: "📋 Normal TODOs",
     itemEmoji: "📝",
-    themeColor: "foreground",                       // Default text color
+    themeColor: "foreground",
     tooltipPrefix: "📝 TODO (//TODO)",
   },
 ];
 
 // ─── Tree item class ──────────────────────────────────────────────────────────
 
-/**
- * One node in the sidebar tree.
- * Either a section header (collapsible) or a TODO item (leaf/clickable).
- */
 export class TodoTreeItem extends vscode.TreeItem {
+  public children?: TodoTreeItem[];
+
   constructor(
     label: string,
     collapsibleState: vscode.TreeItemCollapsibleState,
-    /** Only set on leaf TODO nodes, not on section headers */
     public readonly todoData?: TodoItem
   ) {
     super(label, collapsibleState);
@@ -95,57 +87,21 @@ export class TodoTreeItem extends vscode.TreeItem {
 // ─── Tree data provider ───────────────────────────────────────────────────────
 
 export class TodoTreeProvider implements vscode.TreeDataProvider<TodoTreeItem> {
-
-  // ── Change event ──────────────────────────────────────────────────────────
-
-  private _onDidChangeTreeData =
-    new vscode.EventEmitter<TodoTreeItem | undefined | void>();
+  private _onDidChangeTreeData = new vscode.EventEmitter<TodoTreeItem | undefined | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  // ── Internal data store ────────────────────────────────────────────────────
+  private rootNodes: TodoTreeItem[] = [];
+  private _totalCount = 0;
 
-  /**
-   * Map from TodoKind → array of items for that kind.
-   * Updated by `update()` and read by `getChildren()`.
-   */
-  private buckets = new Map<TodoKind, TodoItem[]>([
-    ["p1", []], ["p2", []], ["p3", []], ["p4", []], ["p5", []], ["normal", []],
-  ]);
+  get totalCount(): number {
+    return this._totalCount;
+  }
 
-  // ── Public API ─────────────────────────────────────────────────────────────
-
-  /**
-   * Replace all stored TODOs and trigger a UI refresh.
-   * Called after every workspace scan.
-   */
   update(allTodos: TodoItem[]): void {
-    // Clear all buckets first
-    for (const key of this.buckets.keys()) {
-      this.buckets.set(key, []);
-    }
-
-    // Distribute each TODO into its bucket
-    for (const todo of allTodos) {
-      const bucket = this.buckets.get(todo.kind);
-      if (bucket) {
-        bucket.push(todo);
-      }
-    }
-
-    // Tell VS Code to re-render the tree
+    this._totalCount = allTodos.length;
+    this.rootNodes = this.buildTree(allTodos);
     this._onDidChangeTreeData.fire();
   }
-
-  /** Total count across all kinds — used for the sidebar badge */
-  get totalCount(): number {
-    let count = 0;
-    for (const items of this.buckets.values()) {
-      count += items.length;
-    }
-    return count;
-  }
-
-  // ── TreeDataProvider implementation ────────────────────────────────────────
 
   getTreeItem(element: TodoTreeItem): vscode.TreeItem {
     return element;
@@ -153,29 +109,19 @@ export class TodoTreeProvider implements vscode.TreeDataProvider<TodoTreeItem> {
 
   getChildren(element?: TodoTreeItem): TodoTreeItem[] {
     if (!element) {
-      // Root: return all 6 section headers
-      return this.buildSectionHeaders();
+      return this.rootNodes;
     }
-
-    // A section header was clicked — return its children
-    const kind = element.contextValue?.replace("section-", "") as TodoKind | undefined;
-    if (kind && this.buckets.has(kind)) {
-      return this.buildItemNodes(kind);
-    }
-
-    return [];
+    return element.children ?? [];
   }
 
-  // ── Private builders ───────────────────────────────────────────────────────
+  // ─── Private builders ───────────────────────────────────────────────────────
 
-  /**
-   * Builds all 6 section header nodes.
-   * Sections with zero items are shown collapsed; sections with items are expanded.
-   */
-  private buildSectionHeaders(): TodoTreeItem[] {
-    return SECTIONS.map((section) => {
-      const items = this.buckets.get(section.kind) ?? [];
-      const count = items.length;
+  private buildTree(allTodos: TodoItem[]): TodoTreeItem[] {
+    const sectionNodes: TodoTreeItem[] = [];
+
+    for (const section of SECTIONS) {
+      const todosForSection = allTodos.filter((t) => t.kind === section.kind);
+      const count = todosForSection.length;
 
       const header = new TodoTreeItem(
         `${section.label}  (${count})`,
@@ -183,51 +129,154 @@ export class TodoTreeProvider implements vscode.TreeDataProvider<TodoTreeItem> {
           ? vscode.TreeItemCollapsibleState.Expanded
           : vscode.TreeItemCollapsibleState.Collapsed
       );
-
-      // contextValue encodes which kind this section holds
-      // (used in getChildren to look up the right bucket)
+      header.id = `section-${section.kind}`;
       header.contextValue = `section-${section.kind}`;
-
-      // Apply the section's color to the icon
       header.iconPath = new vscode.ThemeIcon(
         section.kind === "normal" ? "list-unordered" : "circle-filled",
         new vscode.ThemeColor(section.themeColor)
       );
 
-      return header;
-    });
+      if (count > 0) {
+        header.children = this.buildHierarchy(todosForSection, section);
+      } else {
+        header.children = [];
+      }
+
+      sectionNodes.push(header);
+    }
+
+    return sectionNodes;
   }
 
-  /**
-   * Builds leaf nodes for all TODOs belonging to one kind.
-   * Each node is clickable and jumps to the file + line.
-   */
-  private buildItemNodes(kind: TodoKind): TodoTreeItem[] {
-    const items = this.buckets.get(kind) ?? [];
-    const section = SECTIONS.find((s) => s.kind === kind)!;
+  private buildHierarchy(todos: TodoItem[], section: typeof SECTIONS[0]): TodoTreeItem[] {
+    interface Node {
+      name: string;
+      path: string;
+      isFolder: boolean;
+      uri?: vscode.Uri;
+      children: Map<string, Node>;
+      todos: TodoItem[];
+    }
 
-    return items.map((todo) => {
-      const node = new TodoTreeItem(
-        `${section.itemEmoji}  ${todo.message}`,
-        vscode.TreeItemCollapsibleState.None,
-        todo
-      );
+    const root: Node = { name: "root", path: "", isFolder: true, children: new Map(), todos: [] };
 
-      // Secondary text shown greyed-out to the right of the label
-      node.description = `${todo.fileName}:${todo.lineNumber}`;
+    // 1. Build an intermediate folder/file tree
+    for (const todo of todos) {
+      const uri = vscode.Uri.file(todo.filePath);
+      // Get workspace-relative path if possible; otherwise use basename
+      const relativePath = vscode.workspace.asRelativePath(uri, false);
+      const parts = relativePath.split(/[/\\]/);
 
-      // Full path shown on hover
-      node.tooltip = `${section.tooltipPrefix}\n${todo.filePath}  (line ${todo.lineNumber})`;
+      let current = root;
+      let currentPath = "";
 
-      // Clicking the node opens the file at the correct line
-      node.command = {
-        command: "todoTracker.openFile",
-        title: "Open File",
-        arguments: [todo.filePath, todo.lineNumber],
-      };
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const isFile = i === parts.length - 1;
+        
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
 
-      node.contextValue = `todo-${kind}`;
-      return node;
-    });
+        if (!current.children.has(part)) {
+          // Attempt to map the actual URI for the file or folder so VS Code
+          // can supply the correct file/folder icon and theme colors.
+          let nodeUri: vscode.Uri | undefined;
+          if (isFile) {
+            nodeUri = uri;
+          } else {
+            // Reconstruct the folder URI from the original file's URI
+            const folderUri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders?.[0]?.uri || uri, currentPath);
+            nodeUri = folderUri;
+          }
+
+          current.children.set(part, {
+            name: part,
+            path: currentPath,
+            isFolder: !isFile,
+            uri: nodeUri,
+            children: new Map(),
+            todos: [],
+          });
+        }
+
+        current = current.children.get(part)!;
+
+        if (isFile) {
+          current.todos.push(todo);
+        }
+      }
+    }
+
+    // 2. Convert intermediate tree into TodoTreeItem nodes
+    const convertNode = (node: Node): TodoTreeItem[] => {
+      const items: TodoTreeItem[] = [];
+
+      // Sort: folders first, then files
+      const sortedChildren = Array.from(node.children.values()).sort((a, b) => {
+        if (a.isFolder && !b.isFolder) return -1;
+        if (!a.isFolder && b.isFolder) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      for (const child of sortedChildren) {
+        if (child.isFolder) {
+          const folderItem = new TodoTreeItem(
+            child.name,
+            vscode.TreeItemCollapsibleState.Expanded
+          );
+          folderItem.id = `folder-${section.kind}-${child.path}`;
+          folderItem.contextValue = "folder";
+          folderItem.resourceUri = child.uri;
+          folderItem.children = convertNode(child);
+          items.push(folderItem);
+        } else {
+          // It's a file
+          const fileItem = new TodoTreeItem(
+            child.name,
+            vscode.TreeItemCollapsibleState.Expanded
+          );
+          fileItem.id = `file-${section.kind}-${child.path}`;
+          fileItem.contextValue = "file";
+          fileItem.resourceUri = child.uri;
+
+          // For each file, the children are the specific TODOs
+          fileItem.children = child.todos.map((todo) => {
+            const todoItem = new TodoTreeItem(
+              `Line ${todo.lineNumber}: ${todo.message || "TODO"}`,
+              vscode.TreeItemCollapsibleState.None,
+              todo
+            );
+            
+            todoItem.id = `todo-${section.kind}-${child.path}-${todo.lineNumber}`;
+
+            // Icon for the specific TODO
+            todoItem.iconPath = new vscode.ThemeIcon(
+              "issue-draft",
+              new vscode.ThemeColor(section.themeColor)
+            );
+
+            todoItem.tooltip = `${section.tooltipPrefix}\n${todo.filePath} (line ${todo.lineNumber})`;
+            
+            // Allow clicking to jump to line
+            todoItem.command = {
+              command: "todoTracker.openFile",
+              title: "Open File",
+              arguments: [todo.filePath, todo.lineNumber],
+            };
+            
+            todoItem.contextValue = `todo-${section.kind}`;
+            return todoItem;
+          });
+
+          // Sort TODOs by line number
+          fileItem.children.sort((a, b) => (a.todoData!.lineNumber - b.todoData!.lineNumber));
+
+          items.push(fileItem);
+        }
+      }
+
+      return items;
+    };
+
+    return convertNode(root);
   }
 }
