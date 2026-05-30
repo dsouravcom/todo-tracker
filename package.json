@@ -1,9 +1,9 @@
 {
-  "name": "todo-tracker",
-  "displayName": "TODO Tracker",
+  "name": "todolens",
+  "displayName": "TodoLens - TODO Tracker",
   "description": "Track regular TODOs and priority @TODOs across your workspace with a smart sidebar view.",
   "version": "1.0.0",
-  "publisher": "sourav",
+  "publisher": "sourav-dutta",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -17,6 +17,11 @@
   },
   "homepage": "https://github.com/dsouravcom/todo-tracker#readme",
   "categories": ["Other"],
+  "keywords": ["todo", "task", "tracker", "priority", "sidebar"],
+  "galleryBanner": {
+    "color": "#0F1428",
+    "theme": "dark"
+  },
   "icon": "images/icon.png",
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
